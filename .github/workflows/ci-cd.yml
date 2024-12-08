@@ -17,17 +17,18 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y conntrack socat ebtables iptables git wget curl
-          curl -LO https://go.dev/dl/go1.23.0.linux-amd64.tar.gz
-          sudo tar -C /usr/local -xzf go1.23.0.linux-amd64.tar.gz
-          echo "export PATH=$PATH:/usr/local/go/bin" >> $HOME/.bashrc
-          source $HOME/.bashrc
+          curl -LO https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.31.0/crictl-v1.31.0-linux-amd64.tar.gz
+          sudo tar -C /usr/local/bin -xzf crictl-v1.31.0-linux-amd64.tar.gz
+          sudo chmod +x /usr/local/bin/crictl
+          rm -f crictl-v1.31.0-linux-amd64.tar.gz
 
       - name: Install cri-dockerd
         run: |
+          sudo apt-get install -y golang
           git clone https://github.com/Mirantis/cri-dockerd.git
           cd cri-dockerd
           mkdir bin
-          /usr/local/go/bin/go build -o cri-dockerd
+          go build -o cri-dockerd
           sudo cp cri-dockerd /usr/bin/
           cd ..
           rm -rf cri-dockerd
