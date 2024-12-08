@@ -49,6 +49,13 @@ jobs:
           echo "Waiting for pods to be ready..."
           kubectl wait --for=condition=ready pod -l app=my-app --timeout=120s
 
+      - name: Debug Kubernetes Pods
+        if: failure()
+        run: |
+          echo "Fetching pod descriptions and logs for debugging..."
+          kubectl describe pod -l app=my-app
+          kubectl logs -l app=my-app
+
       - name: Test Kubernetes Deployment
         run: |
           echo "Testing the service..."
