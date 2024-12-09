@@ -1,4 +1,4 @@
-name: CI/CD for Minikube
+name: CI/CD for Kind
 
 on:
   push:
@@ -16,34 +16,38 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          sudo apt-get remove -y containerd || true
           sudo apt-get update
           sudo apt-get install -y curl conntrack
           curl -fsSL https://get.docker.com -o get-docker.sh
           sudo sh get-docker.sh
-          curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
-          sudo install minikube-linux-amd64 /usr/local/bin/minikube
           curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
           chmod +x kubectl
           sudo mv kubectl /usr/local/bin/
+          curl -LO https://github.com/kubernetes-sigs/kind/releases/download/v0.20.0/kind-linux-amd64
+          chmod +x kind-linux-amd64
+          sudo mv kind-linux-amd64 /usr/local/bin/kind
 
-      - name: Start Minikube
+      - name: Create Kind Cluster
         run: |
-          minikube start --driver=docker
+          kind create cluster --name ci-cd-cluster
 
       - name: Log in to Docker Hub
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
-      - name: Build and Push Docker Image
+      - name: Build and Load Docker Image
         run: |
           docker build -t my-app:latest -f app/Dockerfile .
-          docker tag my-app:latest renancavalcantercb/my-app:latest
-          docker push renancavalcantercb/my-app:latest
+          kind load docker-image my-app:latest --name ci-cd-cluster
 
       - name: Apply Kubernetes Manifests
         run: |
           kubectl apply -f k8s/deployment.yaml
           kubectl apply -f k8s/service.yaml
+
+      - name: Wait for Pods to be Ready
+        run: |
+          echo "Waiting for pods to be ready..."
+          kubectl wait --for=condition=ready pod -l app=my-app --timeout=600s
 
       - name: Debug Kubernetes Resources
         run: |
@@ -62,16 +66,10 @@ jobs:
           echo "Fetching pod description for debugging..."
           kubectl describe pod -l app=my-app
 
-      - name: Wait for Pods to be Ready
-        run: |
-          echo "Waiting for pods to be ready..."
-          kubectl wait --for=condition=ready pod -l app=my-app --timeout=600s
-
       - name: Test Kubernetes Deployment
         run: |
           echo "Testing the service..."
-          MINIKUBE_IP=$(minikube ip)
-          NODE_PORT=$(kubectl get svc app-service -o=jsonpath='{.spec.ports[0].nodePort}')
-          echo "Service is available at http://$MINIKUBE_IP:$NODE_PORT"
-          curl --fail "http://$MINIKUBE_IP:$NODE_PORT" || exit 1
+          CLUSTER_IP=$(kubectl get svc app-service -o=jsonpath='{.spec.clusterIP}')
+          echo "Service is available at http://$CLUSTER_IP:80"
+          curl --fail "http://$CLUSTER_IP:80" || exit 1
 
