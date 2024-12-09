@@ -44,11 +44,20 @@ jobs:
           kubectl apply -f k8s/deployment.yaml
           kubectl apply -f k8s/service.yaml
 
+      - name: Ensure Node Readiness
+        run: |
+          kubectl taint nodes --all node.kubernetes.io/not-ready:NoSchedule- || true
+
       - name: Debug Pods
         run: |
           echo "Fetching pod details for debugging..."
           kubectl get pods -o wide
           kubectl describe pods
+
+      - name: Fetch Container Logs
+        run: |
+          echo "Fetching container logs for debugging..."
+          kubectl logs -l app=my-app
 
       - name: Wait Before Checking Pods
         run: sleep 30
@@ -56,7 +65,7 @@ jobs:
       - name: Wait for Pods to be Ready
         run: |
           echo "Waiting for pods to be ready..."
-          kubectl wait --for=condition=ready pod -l app=my-app --timeout=600s || {
+          kubectl wait --for=condition=ready pod -l app=my-app --timeout=180s || {
             echo "Pods not ready, fetching pod details..."
             kubectl get pods -o wide
             kubectl describe pod -l app=my-app
@@ -68,4 +77,3 @@ jobs:
           kubectl port-forward service/app-service 8080:80 &
           sleep 5
           curl http://localhost:8080
-
