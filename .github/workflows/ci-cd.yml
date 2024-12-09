@@ -19,8 +19,8 @@ jobs:
       - name: Build and Push Docker Image
         run: |
           docker build -t my-app:latest -f app/Dockerfile .
-          docker tag my-app:latest <dockerhub-username>/my-app:latest
-          docker push <dockerhub-username>/my-app:latest
+          docker tag my-app:latest renancavalcantercb/my-app:latest
+          docker push renancavalcantercb/my-app:latest
 
       - name: Start Minikube
         run: |
@@ -43,4 +43,3 @@ jobs:
           NODE_PORT=$(kubectl get svc app-service -o=jsonpath='{.spec.ports[0].nodePort}')
           echo "Service is available at http://$MINIKUBE_IP:$NODE_PORT"
           curl --fail "http://$MINIKUBE_IP:$NODE_PORT" || exit 1
-
