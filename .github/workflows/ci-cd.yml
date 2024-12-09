@@ -44,32 +44,28 @@ jobs:
           kubectl apply -f k8s/deployment.yaml
           kubectl apply -f k8s/service.yaml
 
+      - name: Debug Pods
+        run: |
+          echo "Fetching pod details for debugging..."
+          kubectl get pods -o wide
+          kubectl describe pods
+
+      - name: Wait Before Checking Pods
+        run: sleep 30
+
       - name: Wait for Pods to be Ready
         run: |
           echo "Waiting for pods to be ready..."
-          kubectl wait --for=condition=ready pod -l app=my-app --timeout=600s
+          kubectl wait --for=condition=ready pod -l app=my-app --timeout=600s || {
+            echo "Pods not ready, fetching pod details..."
+            kubectl get pods -o wide
+            kubectl describe pod -l app=my-app
+            exit 1
+          }
 
-      - name: Debug Kubernetes Resources
+      - name: Port Forward and Test
         run: |
-          echo "Fetching Kubernetes resources for debugging..."
-          kubectl get pods
-          kubectl get deployments
-          kubectl get services
-
-      - name: Debug Pods Logs
-        run: |
-          echo "Fetching pod logs for debugging..."
-          kubectl logs -l app=my-app
-
-      - name: Debug Pods Description
-        run: |
-          echo "Fetching pod description for debugging..."
-          kubectl describe pod -l app=my-app
-
-      - name: Test Kubernetes Deployment
-        run: |
-          echo "Testing the service..."
-          CLUSTER_IP=$(kubectl get svc app-service -o=jsonpath='{.spec.clusterIP}')
-          echo "Service is available at http://$CLUSTER_IP:80"
-          curl --fail "http://$CLUSTER_IP:80" || exit 1
+          kubectl port-forward service/app-service 8080:80 &
+          sleep 5
+          curl http://localhost:8080
 
