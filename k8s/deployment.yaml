@@ -15,8 +15,8 @@ spec:
     spec:
       containers:
         - name: my-app
-          image: renancavalcantercb/my-app:latest
-          imagePullPolicy: Always
+          image: my-app:latest
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
           readinessProbe:
@@ -31,4 +31,3 @@ spec:
               port: 8080
             initialDelaySeconds: 10
             periodSeconds: 20
-
