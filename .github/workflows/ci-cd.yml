@@ -4,40 +4,27 @@ on:
   push:
     branches:
       - main
-  pull_request:
 
 jobs:
-  build-deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Install Dependencies
+      - name: Log in to Docker Hub
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Build and Push Docker Image
         run: |
-          sudo apt-get remove -y containerd || true
-          sudo apt-get update
-          sudo apt-get install -y curl conntrack
-          curl -fsSL https://get.docker.com -o get-docker.sh
-          sudo sh get-docker.sh
-          curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
-          sudo install minikube-linux-amd64 /usr/local/bin/minikube
-          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-          chmod +x kubectl
-          sudo mv kubectl /usr/local/bin/
+          docker build -t my-app:latest -f app/Dockerfile .
+          docker tag my-app:latest <dockerhub-username>/my-app:latest
+          docker push <dockerhub-username>/my-app:latest
 
       - name: Start Minikube
         run: |
           minikube start --driver=docker
-
-      - name: Build Docker Image
-        run: |
-          eval $(minikube docker-env)
-          docker build -t my-app:latest -f app/Dockerfile .
-
-      - name: Load Docker Image into Minikube
-        run: minikube image load my-app:latest
 
       - name: Apply Kubernetes Manifests
         run: |
@@ -48,13 +35,6 @@ jobs:
         run: |
           echo "Waiting for pods to be ready..."
           kubectl wait --for=condition=ready pod -l app=my-app --timeout=120s
-
-      - name: Debug Kubernetes Pods
-        if: failure()
-        run: |
-          echo "Fetching pod descriptions and logs for debugging..."
-          kubectl describe pod -l app=my-app
-          kubectl logs -l app=my-app
 
       - name: Test Kubernetes Deployment
         run: |

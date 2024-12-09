@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: my-app
-          image: my-app:latest
-          imagePullPolicy: Never
+          image: renancavalcantercb/my-app:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8080
