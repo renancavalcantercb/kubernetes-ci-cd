@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  pull_request:
 
 jobs:
   build-and-deploy:
@@ -12,6 +13,23 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get remove -y containerd || true
+          sudo apt-get update
+          sudo apt-get install -y curl conntrack
+          curl -fsSL https://get.docker.com -o get-docker.sh
+          sudo sh get-docker.sh
+          curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+          sudo install minikube-linux-amd64 /usr/local/bin/minikube
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+
+      - name: Start Minikube
+        run: |
+          minikube start --driver=docker
 
       - name: Log in to Docker Hub
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
@@ -22,19 +40,27 @@ jobs:
           docker tag my-app:latest renancavalcantercb/my-app:latest
           docker push renancavalcantercb/my-app:latest
 
-      - name: Start Minikube
-        run: |
-          minikube start --driver=docker
-
       - name: Apply Kubernetes Manifests
         run: |
           kubectl apply -f k8s/deployment.yaml
           kubectl apply -f k8s/service.yaml
 
+      - name: Debug Kubernetes Resources
+        run: |
+          echo "Fetching Kubernetes resources for debugging..."
+          kubectl get pods
+          kubectl get deployments
+          kubectl get services
+
+      - name: Debug Kubernetes Pods
+        run: |
+          echo "Fetching pod descriptions for detailed debugging..."
+          kubectl describe pod -l app=my-app
+
       - name: Wait for Pods to be Ready
         run: |
           echo "Waiting for pods to be ready..."
-          kubectl wait --for=condition=ready pod -l app=my-app --timeout=120s
+          kubectl wait --for=condition=ready pod -l app=my-app --timeout=300s
 
       - name: Test Kubernetes Deployment
         run: |
@@ -43,3 +69,4 @@ jobs:
           NODE_PORT=$(kubectl get svc app-service -o=jsonpath='{.spec.ports[0].nodePort}')
           echo "Service is available at http://$MINIKUBE_IP:$NODE_PORT"
           curl --fail "http://$MINIKUBE_IP:$NODE_PORT" || exit 1
+
