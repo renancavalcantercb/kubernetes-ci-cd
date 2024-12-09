@@ -52,15 +52,17 @@ jobs:
           kubectl get deployments
           kubectl get services
 
-      - name: Debug Kubernetes Pods
-        run: |
-          echo "Fetching pod descriptions for detailed debugging..."
-          kubectl describe pod -l app=my-app
-
       - name: Wait for Pods to be Ready
         run: |
           echo "Waiting for pods to be ready..."
-          kubectl wait --for=condition=ready pod -l app=my-app --timeout=300s
+          kubectl wait --for=condition=ready pod -l app=my-app --timeout=600s
+
+      - name: Debug Pods After Timeout
+        if: failure()
+        run: |
+          echo "Debugging pods after timeout..."
+          kubectl describe pod -l app=my-app
+          kubectl logs -l app=my-app
 
       - name: Test Kubernetes Deployment
         run: |
